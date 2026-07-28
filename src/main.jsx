@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import CurvedInput from './CurvedInput';
+import Connect from './Connect';
 import './style.css';
 
 function App() {
@@ -9,6 +10,7 @@ function App() {
   const [successCopy, setSuccessCopy] = useState({
     title: 'Check your texts',
     detail: 'Bagel will take it from here.',
+    href: '',
   });
   const [phoneError, setPhoneError] = useState('');
 
@@ -39,10 +41,11 @@ function App() {
       if (body.status === 'needs_first_message') {
         setSuccessCopy({
           title: 'Send Bagel a text',
-          detail: 'Apple requires the first message to come from you.',
+          detail: 'Send any message first to open the conversation.',
+          href: body.line_handle ? `sms:${body.line_handle}` : '',
         });
       } else {
-        setSuccessCopy({ title: 'Check your texts', detail: 'Bagel will take it from here.' });
+        setSuccessCopy({ title: 'Check your texts', detail: 'Bagel will take it from here.', href: '' });
       }
       setSent(true);
     } catch (error) {
@@ -95,7 +98,7 @@ function App() {
             </div>
             <div className="success-wrap" role="status" aria-live="polite" aria-hidden={!sent}>
               <span className="success-kicker">Message sent</span>
-              <div className="success-card"><span className="success-check"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5.5 12.5 4 4 9-9"/></svg></span><div><strong>{successCopy.title}</strong><small>{successCopy.detail}</small></div></div>
+              <div className="success-card"><span className="success-check"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5.5 12.5 4 4 9-9"/></svg></span><div><strong>{successCopy.href ? <a href={successCopy.href}>{successCopy.title}</a> : successCopy.title}</strong><small>{successCopy.detail}</small></div></div>
             </div>
           </div>
         </div>
@@ -106,4 +109,6 @@ function App() {
   );
 }
 
-createRoot(document.getElementById('app')).render(<App />);
+createRoot(document.getElementById('app')).render(
+  window.location.pathname === '/connect' ? <Connect /> : <App />
+);

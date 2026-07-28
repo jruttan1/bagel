@@ -1,0 +1,66 @@
+.connect-shell {
+  min-height: 100svh;
+  display: grid;
+  place-items: center;
+  padding: 84px 24px 56px;
+  color: #fff8e8;
+  background:
+    linear-gradient(rgba(8, 24, 33, .48), rgba(8, 24, 33, .66)),
+    url('/assets/bagel-morning-mountains.png') center / cover fixed;
+}
+
+.connect-brand {
+  position: absolute;
+  top: 34px;
+  left: 40px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font: 500 25px/1 system-ui, sans-serif;
+}
+
+.connect-brand img { width: 30px; height: 30px; }
+
+.connect-card {
+  width: min(100%, 430px);
+  padding: 36px;
+  border: 1px solid rgba(255, 248, 230, .28);
+  border-radius: 28px;
+  background: rgba(17, 35, 43, .72);
+  box-shadow: 0 26px 80px rgba(0, 0, 0, .25);
+  backdrop-filter: blur(22px);
+}
+
+.connect-card h1 { margin: 8px 0 10px; font: 400 35px/1.08 Georgia, serif; }
+.connect-card p { margin: 0 0 26px; color: rgba(255, 248, 232, .7); line-height: 1.5; }
+.connect-label { font-size: 12px; letter-spacing: .05em; color: rgba(255, 248, 232, .62); }
+.connect-card form { display: grid; gap: 16px; }
+.connect-card label { display: grid; gap: 7px; font-size: 13px; color: rgba(255, 248, 232, .76); }
+.connect-card input {
+  min-height: 48px;
+  padding: 0 15px;
+  border: 1px solid rgba(255, 248, 230, .25);
+  border-radius: 15px;
+  color: #fff8e8;
+  background: rgba(255, 255, 255, .08);
+  outline: none;
+}
+.connect-card input:focus { border-color: rgba(255, 248, 230, .7); }
+.connect-card button {
+  min-height: 50px;
+  border: 0;
+  border-radius: 16px;
+  color: #17303a;
+  background: #f3e5c8;
+  font-weight: 650;
+  cursor: pointer;
+}
+.connect-card button:disabled { opacity: .6; cursor: wait; }
+.connect-error { color: #ffd2c2; line-height: 1.4; }
+.connect-done { display: grid; place-items: center; width: 38px; height: 38px; border-radius: 50%; color: #17303a; background: #f3e5c8; }
+.connect-security { position: absolute; bottom: 22px; margin: 0; font-size: 12px; color: rgba(255, 248, 232, .6); }
+
+@media (max-width: 600px) {
+  .connect-brand { top: 24px; left: 24px; }
+  .connect-card { padding: 28px 22px; }
+}
