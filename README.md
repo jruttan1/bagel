@@ -1,15 +1,15 @@
-# bagel
+# bagel 🥯
 
-Bagel is an investment assistant that works through text messages.
+Bagel is an investment assistant that lives in your messages.
 
-A user enters their phone number on the landing page and continues through iMessage. They connect their Wealthsimple account and answer a few short questions about their financial position and how they invest.
+As I tried to get into investing, I found myself caught up in social media noise and market volatility. I wanted grounded info on what was moving my stocks without reading through news papers so I came to this as the solution.
 
-Bagel syncs their accounts, holdings, balances, transactions, and portfolio history. It follows relevant market activity and sends a short morning message about what is affecting the portfolio. The user can also text questions at any time.
+Bagel follows your portfolio, understands why you own your investments, and sends a short morning update explaining what moved, why it happened, and whether it matters.
 
-The backend uses FastAPI, Neon Postgres, `ws-api`, messages.dev, OpenAI, and APScheduler.
+You can connect your investment account, share your investing approach, and text Bagel questions whenever you want.
 
-Portfolio data and current market information take priority over a user's stated thesis. Onboarding answers and investment preferences are kept as background context and only mentioned when they materially change the answer.
+The name is a nod to a Wall Street banker's morning routine. Checking the markets with a coffee and a bagel before the day begins.
 
-Wealthsimple passwords are not stored. The authenticated session is encrypted before it is saved.
+Built so far with FastAPI, Neon Postgres, `ws-api`, messages.dev, and APScheduler.
 
-Inspired by [Poke](https://interaction.co) after using it to track my calories over text for three months
+Inspired by [Poke](https://interaction.co) after using it to track my calories over text.
