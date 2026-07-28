@@ -37,6 +37,7 @@ class RawWealthsimpleData:
     positions: list[dict]
     market_data: dict[str, dict]
     activities: list[tuple[str, dict]]
+    historical: list[dict]
 
 
 class WealthsimpleService:
@@ -149,7 +150,10 @@ class WealthsimpleService:
             if account_id and "credit-card" not in account_id:
                 for activity in ws.get_activities(account_id) or []:
                     activities.append((account_id, activity))
-        return RawWealthsimpleData(refreshed["session"], accounts, positions, market_data, activities)
+        historical = ws.get_identity_historical_financials(currency="CAD", first=365) or []
+        return RawWealthsimpleData(
+            refreshed["session"], accounts, positions, market_data, activities, historical
+        )
 
     async def _persist_sync(
         self,
@@ -182,6 +186,8 @@ class WealthsimpleService:
             else:
                 for key, value in values.items():
                     setattr(db_account, key, value)
+
+        await _persist_historical_snapshots(session, user_id, raw.historical)
 
         normalized = [_normalize_position(row, raw.market_data) for row in raw.positions]
         normalized = [row for row in normalized if row is not None and row["current_value"] != 0]
@@ -290,6 +296,40 @@ def _normalize_position(row: dict, market_data: dict[str, dict]) -> dict | None:
     }
 
 
+async def _persist_historical_snapshots(session: AsyncSession, user_id: UUID, historical: list[dict]) -> None:
+    if not historical:
+        return
+    existing = set(
+        (
+            await session.execute(
+                select(PortfolioSnapshot.captured_at).where(PortfolioSnapshot.user_id == user_id)
+            )
+        ).scalars()
+    )
+    existing_dates = {_as_date(value) for value in existing}
+    today = datetime.now(UTC).date()
+    for edge in historical:
+        row = edge.get("node", edge)
+        captured_date = _parse_date(row.get("date"))
+        if captured_date is None or captured_date >= today or captured_date in existing_dates:
+            continue
+        total_value = _decimal(_dig(row, "netLiquidationValueV2", "amount"))
+        session.add(
+            PortfolioSnapshot(
+                user_id=user_id,
+                captured_at=datetime.combine(captured_date, datetime.min.time(), tzinfo=UTC),
+                total_value=total_value,
+                cash=0,
+                currency=_dig(row, "netLiquidationValueV2", "currency") or "CAD",
+                allocation={},
+                source_hash=hashlib.sha256(
+                    f"historical:{captured_date.isoformat()}:{total_value}".encode()
+                ).hexdigest(),
+            )
+        )
+        existing_dates.add(captured_date)
+
+
 def _account_value(account: dict) -> Decimal:
     return _decimal(
         _dig(account, "financials", "currentCombined", "netLiquidationValue", "amount")
@@ -334,6 +374,19 @@ def _parse_datetime(value: Any) -> datetime:
         return datetime.fromisoformat(str(value).replace("Z", "+00:00"))
     except ValueError:
         return datetime.now(UTC)
+
+
+def _parse_date(value: Any):
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(str(value).replace("Z", "+00:00")).date()
+    except ValueError:
+        return None
+
+
+def _as_date(value: datetime):
+    return value.date()
 
 
 def _looks_like_auth_error(exc: Exception) -> bool:
