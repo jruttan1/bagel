@@ -35,7 +35,11 @@ class MessagesDevClient:
         if not self.settings.messages_api_key:
             raise MessagesDevError("MESSAGES_API_KEY is not configured")
         async with self._http() as client:
-            response = await client.post(path, json=payload)
+            response = await client.post(
+                path,
+                json=payload,
+                headers={"Authorization": f"Bearer {self.settings.messages_api_key}"},
+            )
         if response.is_error:
             data = _safe_json(response)
             error = data.get("error", {})

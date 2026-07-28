@@ -62,9 +62,10 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Bagel API", version="0.1.0", lifespan=lifespan)
+settings = get_settings()
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=list({"http://localhost:5173", settings.app_base_url.rstrip("/")}),
     allow_credentials=False,
     allow_methods=["GET", "POST", "PUT"],
     allow_headers=["Content-Type", "X-Admin-Key"],

@@ -31,6 +31,8 @@ async def connect(
     request: Request,
     session: DbSession,
 ) -> WealthsimpleConnectResponse:
+    if request.app.state.wealthsimple is None:
+        raise HTTPException(status_code=503, detail="Credential encryption is not configured")
     try:
         link, user = await request.app.state.connection_links.resolve(session, payload.token)
         await request.app.state.wealthsimple.connect(

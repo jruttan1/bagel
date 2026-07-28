@@ -17,6 +17,8 @@ async def sync_user(
     request: Request,
     session: DbSession,
 ) -> SyncResult:
+    if request.app.state.wealthsimple is None:
+        raise HTTPException(status_code=503, detail="Wealthsimple is not configured")
     try:
         return await request.app.state.wealthsimple.sync_user(session, user_id)
     except WealthsimpleIntegrationError as exc:
@@ -25,6 +27,8 @@ async def sync_user(
 
 @router.post("/users/{user_id}/brief")
 async def send_brief(user_id: UUID, request: Request) -> dict[str, bool]:
+    if request.app.state.briefs is None:
+        raise HTTPException(status_code=503, detail="Portfolio briefs are not configured")
     return {"sent": await request.app.state.briefs.send_for_user(user_id)}
 
 

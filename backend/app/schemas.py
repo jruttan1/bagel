@@ -13,6 +13,7 @@ class SignupRequest(BaseModel):
 class SignupResponse(BaseModel):
     user_id: UUID
     status: Literal["message_queued", "already_registered", "needs_first_message"]
+    line_handle: str | None = None
 
 
 class WealthsimpleConnectRequest(BaseModel):
