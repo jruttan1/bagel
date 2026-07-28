@@ -5,9 +5,14 @@ import './style.css';
 
 function App() {
   const [sent, setSent] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [successCopy, setSuccessCopy] = useState({
+    title: 'Check your texts',
+    detail: 'Bagel will take it from here.',
+  });
   const [phoneError, setPhoneError] = useState('');
 
-  const submitPhone = value => {
+  const submitPhone = async value => {
     const input = value.trim();
     const digits = input.replace(/\D/g, '');
     if (!input) {
@@ -19,7 +24,32 @@ function App() {
       return;
     }
     setPhoneError('');
-    setSent(true);
+    setSending(true);
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/v1/signup`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          phone_number: input,
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/Toronto',
+        }),
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.detail || 'Could not start the conversation.');
+      if (body.status === 'needs_first_message') {
+        setSuccessCopy({
+          title: 'Send Bagel a text',
+          detail: 'Apple requires the first message to come from you.',
+        });
+      } else {
+        setSuccessCopy({ title: 'Check your texts', detail: 'Bagel will take it from here.' });
+      }
+      setSent(true);
+    } catch (error) {
+      setPhoneError(error.message || 'Could not start the conversation.');
+    } finally {
+      setSending(false);
+    }
   };
 
   return (
@@ -59,13 +89,13 @@ function App() {
                 shadowSize="none"
                 showIcon={false}
                 onChange={() => phoneError && setPhoneError('')}
-                onSubmit={submitPhone}
+                onSubmit={sending ? undefined : submitPhone}
               />
-              <small id={phoneError ? 'phone-error' : undefined} className={phoneError ? 'phone-error' : ''} role={phoneError ? 'alert' : undefined}>{phoneError || 'Start a private conversation with Bagel.'}</small>
+              <small id={phoneError ? 'phone-error' : undefined} className={phoneError ? 'phone-error' : ''} role={phoneError ? 'alert' : undefined}>{phoneError || (sending ? 'Starting your conversation…' : 'Start a private conversation with Bagel.')}</small>
             </div>
             <div className="success-wrap" role="status" aria-live="polite" aria-hidden={!sent}>
               <span className="success-kicker">Message sent</span>
-              <div className="success-card"><span className="success-check"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5.5 12.5 4 4 9-9"/></svg></span><div><strong>Check your texts</strong><small>Bagel will take it from here.</small></div></div>
+              <div className="success-card"><span className="success-check"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5.5 12.5 4 4 9-9"/></svg></span><div><strong>{successCopy.title}</strong><small>{successCopy.detail}</small></div></div>
             </div>
           </div>
         </div>
