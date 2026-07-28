@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" role="img" aria-labelledby="title desc">
+  <title id="title">Bagel</title>
+  <desc id="desc">A circular bagel-shaped mark with a small center ring and stem.</desc>
+  <defs>
+    <linearGradient id="cream" x1="16" y1="8" x2="82" y2="92" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fff8e8"/>
+      <stop offset="0.5" stop-color="#ead8b7"/>
+      <stop offset="1" stop-color="#f6e7c9"/>
+    </linearGradient>
+  </defs>
+  <g fill="none" stroke="url(#cream)" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M42 88A39 39 0 1 1 59 88"/>
+    <path d="M50 66A15 15 0 1 1 50 36A15 15 0 0 1 50 66V83Q50 91 59 87"/>
+  </g>
+</svg>
