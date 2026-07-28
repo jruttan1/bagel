@@ -1,9 +1,20 @@
 import enum
 import uuid
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from decimal import Decimal
 
-from sqlalchemy import Boolean, Date, DateTime, Enum, ForeignKey, Index, Numeric, String, Text, UniqueConstraint
+from sqlalchemy import (
+    Boolean,
+    Date,
+    DateTime,
+    Enum,
+    ForeignKey,
+    Index,
+    Numeric,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.ext.mutable import MutableDict, MutableList
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -21,10 +32,10 @@ def json_list_type():
 
 
 def utcnow() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
-class ConnectionStatus(str, enum.Enum):
+class ConnectionStatus(enum.StrEnum):
     pending = "pending"
     connected = "connected"
     reauth_required = "reauth_required"
@@ -32,7 +43,7 @@ class ConnectionStatus(str, enum.Enum):
     disconnected = "disconnected"
 
 
-class OnboardingStep(str, enum.Enum):
+class OnboardingStep(enum.StrEnum):
     awaiting_connection = "awaiting_connection"
     financial_position = "financial_position"
     investing_style = "investing_style"
@@ -40,7 +51,7 @@ class OnboardingStep(str, enum.Enum):
     complete = "complete"
 
 
-class MessageDirection(str, enum.Enum):
+class MessageDirection(enum.StrEnum):
     inbound = "inbound"
     outbound = "outbound"
 
@@ -51,14 +62,20 @@ class User(Base):
     phone_number: Mapped[str] = mapped_column(String(32), unique=True, index=True)
     timezone: Mapped[str] = mapped_column(String(64), default="America/Toronto")
     preferences: Mapped[dict] = mapped_column(json_dict_type(), default=dict)
-    notification_settings: Mapped[dict] = mapped_column(json_dict_type(), default=lambda: {"morning_brief": True, "event_alerts": True, "brief_time": "07:30"})
-    onboarding_step: Mapped[OnboardingStep] = mapped_column(Enum(OnboardingStep, native_enum=False), default=OnboardingStep.awaiting_connection)
+    notification_settings: Mapped[dict] = mapped_column(
+        json_dict_type(), default=lambda: {"morning_brief": True, "event_alerts": True, "brief_time": "07:30"}
+    )
+    onboarding_step: Mapped[OnboardingStep] = mapped_column(
+        Enum(OnboardingStep, native_enum=False), default=OnboardingStep.awaiting_connection
+    )
     profile_summary: Mapped[str | None] = mapped_column(Text)
     profile_data: Mapped[dict] = mapped_column(json_dict_type(), default=dict)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
-    wealthsimple_connection: Mapped["WealthsimpleConnection | None"] = relationship(back_populates="user", cascade="all, delete-orphan", uselist=False)
+    wealthsimple_connection: Mapped["WealthsimpleConnection | None"] = relationship(
+        back_populates="user", cascade="all, delete-orphan", uselist=False
+    )
     snapshots: Mapped[list["PortfolioSnapshot"]] = relationship(back_populates="user")
     theses: Mapped[list["InvestmentThesis"]] = relationship(back_populates="user")
 
@@ -69,12 +86,24 @@ class WealthsimpleConnection(Base):
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), unique=True)
     encrypted_session: Mapped[str] = mapped_column(Text)
     encrypted_username: Mapped[str | None] = mapped_column(Text)
-    status: Mapped[ConnectionStatus] = mapped_column(Enum(ConnectionStatus, native_enum=False), default=ConnectionStatus.pending)
+    status: Mapped[ConnectionStatus] = mapped_column(
+        Enum(ConnectionStatus, native_enum=False), default=ConnectionStatus.pending
+    )
     last_successful_sync: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     last_error: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
     user: Mapped[User] = relationship(back_populates="wealthsimple_connection")
+
+
+class ConnectionToken(Base):
+    __tablename__ = "connection_tokens"
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
 class BrokerageAccount(Base):
@@ -218,4 +247,3 @@ class MorningBrief(Base):
     content: Mapped[str] = mapped_column(Text)
     provider_outbox_id: Mapped[str | None] = mapped_column(String(160))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
-

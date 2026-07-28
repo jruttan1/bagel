@@ -25,6 +25,8 @@ class Settings(BaseSettings):
     sync_stale_minutes: int = Field(default=15, ge=1, le=1440)
     webhook_tolerance_seconds: int = Field(default=300, ge=30, le=900)
     max_message_chars: int = Field(default=3500, ge=500, le=10000)
+    connection_link_ttl_minutes: int = Field(default=30, ge=5, le=1440)
+    auto_create_tables: bool = True
 
     @field_validator("database_url")
     @classmethod
@@ -56,4 +58,3 @@ def get_settings() -> Settings:
     settings = Settings()
     settings.validate_runtime_secrets()
     return settings
-

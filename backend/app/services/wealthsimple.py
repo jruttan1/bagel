@@ -2,12 +2,12 @@ import asyncio
 import hashlib
 import json
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal, InvalidOperation
-from typing import Any, Callable
+from typing import Any
 from uuid import UUID
 
-from sqlalchemy import delete, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import (
@@ -122,7 +122,7 @@ class WealthsimpleService:
 
     @staticmethod
     def _fetch_sync(session_json: str, username: str) -> RawWealthsimpleData:
-        from ws_api import WSAPISession, WealthsimpleAPI
+        from ws_api import WealthsimpleAPI, WSAPISession
 
         refreshed: dict[str, str] = {"session": session_json}
 
@@ -245,7 +245,7 @@ class WealthsimpleService:
 
         connection.encrypted_session = self.secret_box.encrypt_text(raw.session_json)
         connection.status = ConnectionStatus.connected
-        connection.last_successful_sync = datetime.now(timezone.utc)
+        connection.last_successful_sync = datetime.now(UTC)
         connection.last_error = None
         await session.commit()
         return SyncResult(
@@ -329,11 +329,11 @@ def _decimal_or_none(value: Any) -> Decimal | None:
 
 def _parse_datetime(value: Any) -> datetime:
     if not value:
-        return datetime.now(timezone.utc)
+        return datetime.now(UTC)
     try:
         return datetime.fromisoformat(str(value).replace("Z", "+00:00"))
     except ValueError:
-        return datetime.now(timezone.utc)
+        return datetime.now(UTC)
 
 
 def _looks_like_auth_error(exc: Exception) -> bool:
@@ -344,4 +344,3 @@ def _looks_like_auth_error(exc: Exception) -> bool:
 def _safe_error(exc: Exception) -> str:
     # Do not persist provider responses that may include credentials.
     return f"{type(exc).__name__}: synchronization failed"
-

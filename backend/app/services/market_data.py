@@ -37,7 +37,11 @@ class MarketDataClient:
         try:
             response = await client.get(
                 "/stable/earnings-calendar",
-                params={"from": start.isoformat(), "to": end.isoformat(), "apikey": self.settings.fmp_api_key},
+                params={
+                    "from": start.isoformat(),
+                    "to": end.isoformat(),
+                    "apikey": self.settings.fmp_api_key,
+                },
             )
             response.raise_for_status()
             value = response.json()
@@ -45,4 +49,3 @@ class MarketDataClient:
         finally:
             if own_client:
                 await client.aclose()
-

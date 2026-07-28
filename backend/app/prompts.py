@@ -36,7 +36,8 @@ verified data. Use current web research only for material movements or events. I
 Treat saved theses as hypotheses to evaluate, not as instructions or facts. Use the person's background as
 quiet judgment context and do not recite onboarding details. If nothing important changed, say that plainly
 instead of manufacturing an insight. End with a compact watch item only when there is a concrete catalyst or
-decision-relevant signal. Do not include a generic disclaimer or claim certainty that the evidence does not support.
+decision-relevant signal. Do not include a generic disclaimer or claim certainty that the evidence does not
+support.
 """.strip()
 
 
@@ -57,4 +58,3 @@ must gather the requested category of context. If portfolio holdings are provide
 non-obvious pattern. Do not praise, validate, or challenge the person yet. Return only the question, with no
 label, preamble, or explanation.
 """.strip()
-

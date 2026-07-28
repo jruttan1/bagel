@@ -1,11 +1,10 @@
 import json
-from decimal import Decimal
 from typing import Any
 
 from openai import AsyncOpenAI
 
 from app.config import Settings
-from app.models import ConversationMessage, Holding, InvestmentThesis, PortfolioSnapshot, User
+from app.models import ConversationMessage, InvestmentThesis, PortfolioSnapshot, User
 from app.prompts import AGENT_INSTRUCTIONS, BRIEF_INSTRUCTIONS, PROFILE_INSTRUCTIONS, QUESTION_INSTRUCTIONS
 
 
@@ -16,7 +15,9 @@ class IntelligenceUnavailable(RuntimeError):
 class IntelligenceService:
     def __init__(self, settings: Settings, client: AsyncOpenAI | None = None):
         self.settings = settings
-        self.client = client or (AsyncOpenAI(api_key=settings.openai_api_key) if settings.openai_api_key else None)
+        self.client = client or (
+            AsyncOpenAI(api_key=settings.openai_api_key) if settings.openai_api_key else None
+        )
 
     def _require_client(self) -> AsyncOpenAI:
         if self.client is None:
@@ -36,7 +37,8 @@ class IntelligenceService:
             "latest_portfolio": _snapshot_context(snapshot),
             "saved_theses": [_thesis_context(thesis) for thesis in theses if thesis.is_active],
             "recent_conversation": [
-                {"direction": message.direction.value, "content": message.content} for message in messages[-10:]
+                {"direction": message.direction.value, "content": message.content}
+                for message in messages[-10:]
             ],
             "current_user_message": incoming_text,
         }
@@ -126,9 +128,7 @@ class IntelligenceService:
         except json.JSONDecodeError as exc:
             raise IntelligenceUnavailable("Profile extraction returned invalid JSON") from exc
 
-    async def onboarding_question(
-        self, category: str, snapshot: PortfolioSnapshot | None
-    ) -> str:
+    async def onboarding_question(self, category: str, snapshot: PortfolioSnapshot | None) -> str:
         payload = {"category": category, "portfolio_characteristics": _snapshot_context(snapshot)}
         response = await self._require_client().responses.create(
             model=self.settings.openai_model,
@@ -215,4 +215,3 @@ def _clean_message(value: str, max_chars: int) -> str:
     if len(text) <= max_chars:
         return text
     return text[: max_chars - 1].rstrip() + "…"
-

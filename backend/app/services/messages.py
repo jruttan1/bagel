@@ -1,5 +1,5 @@
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from typing import AsyncIterator
 
 import httpx
 
@@ -46,9 +46,7 @@ class MessagesDevClient:
             )
         return response.json()
 
-    async def send_message(
-        self, to: str, text: str, *, reply_to: str | None = None
-    ) -> MessageSendResult:
+    async def send_message(self, to: str, text: str, *, reply_to: str | None = None) -> MessageSendResult:
         payload = {"from": self.settings.messages_line_handle, "to": to, "text": text}
         if reply_to:
             payload["reply_to"] = reply_to
@@ -79,4 +77,3 @@ def _safe_json(response: httpx.Response) -> dict:
         return value if isinstance(value, dict) else {}
     except ValueError:
         return {}
-

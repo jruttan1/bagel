@@ -62,4 +62,3 @@ def verify_messages_webhook(
 
 def constant_time_equal(left: str, right: str) -> bool:
     return bool(left and right) and hmac.compare_digest(left, right)
-

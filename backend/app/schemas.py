@@ -12,11 +12,11 @@ class SignupRequest(BaseModel):
 
 class SignupResponse(BaseModel):
     user_id: UUID
-    status: Literal["message_queued", "already_registered"]
+    status: Literal["message_queued", "already_registered", "needs_first_message"]
 
 
 class WealthsimpleConnectRequest(BaseModel):
-    phone_number: str
+    token: str = Field(min_length=20, max_length=256)
     username: str = Field(min_length=3, max_length=320)
     password: str = Field(min_length=1, max_length=512)
     otp: str | None = Field(default=None, min_length=4, max_length=12)
@@ -24,6 +24,11 @@ class WealthsimpleConnectRequest(BaseModel):
 
 class WealthsimpleConnectResponse(BaseModel):
     status: Literal["connected", "otp_required"]
+
+
+class ConnectionTokenStatus(BaseModel):
+    valid: bool
+    phone_hint: str | None = None
 
 
 class ThesisUpsertRequest(BaseModel):
@@ -67,4 +72,3 @@ class SyncResult(BaseModel):
 class HealthResponse(BaseModel):
     status: str
     database: str | None = None
-
