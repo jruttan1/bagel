@@ -32,6 +32,12 @@ message, inspect the portfolio when personal context changes the answer; use cur
 search only when the question depends on recent facts. Prefer company releases, filings, earnings material,
 regulators, and exchanges over market commentary. Saved theses are hypotheses, not facts.
 
+During inbound conversations, save durable facts that will improve future judgment: goals, constraints,
+preferences, experience, and genuine investment convictions. Use a stable memory key so later corrections
+replace old information. Never save casual remarks, temporary market opinions, sensitive credentials, facts
+you inferred without support, or anything learned during a scheduled brief. Forget memory when the person
+clearly retracts or corrects it. Do this quietly without announcing routine memory updates.
+
 Lead with the one thing the person most needs to understand. Explain portfolio impact before general market
 news. Mention only holdings that materially affected the portfolio or thesis. Separate price movement, market
 narrative, and business evidence. Say when nothing meaningful changed. Personalize quietly.
@@ -164,6 +170,7 @@ def _build_tools(market: MarketDataClient) -> list:
         if user is None:
             return {"error": "user_not_found"}
         history = await crud.recent_messages(user_id, limit=10)
+        memories = await crud.active_memories(user_id)
         return {
             "profile": user.profile_data,
             "profile_summary": user.profile_summary,
@@ -171,6 +178,16 @@ def _build_tools(market: MarketDataClient) -> list:
             "notification_settings": user.notification_settings,
             "portfolio": _snapshot(snapshot),
             "theses": [_thesis(thesis) for thesis in user.theses if thesis.is_active],
+            "memories": [
+                {
+                    "key": memory.memory_key,
+                    "category": memory.category,
+                    "summary": memory.summary,
+                    "ticker": memory.ticker,
+                    "updated_at": memory.updated_at.isoformat(),
+                }
+                for memory in memories
+            ],
             "recent_conversation": [
                 {"direction": message.direction.value, "content": message.content}
                 for message in history
@@ -230,12 +247,49 @@ def _build_tools(market: MarketDataClient) -> list:
         user = await crud.user_by_id(user_id)
         return {"brief_time": time, "timezone": user.timezone if user else "UTC"}
 
+    @tool
+    async def save_memory(
+        memory_key: str,
+        category: Literal["goal", "constraint", "preference", "experience", "thesis"],
+        summary: str,
+        runtime: ToolRuntime[AgentContext],
+        ticker: str | None = None,
+    ) -> dict:
+        """Save or update durable user context explicitly learned in an inbound conversation."""
+        if runtime.context.trigger != "inbound":
+            return {"error": "memory_writes_require_inbound_message"}
+        key = memory_key.strip().lower()[:120]
+        text = summary.strip()[:500]
+        if not key or not text:
+            return {"error": "invalid_memory"}
+        memory = await crud.upsert_memory(
+            UUID(runtime.context.user_id),
+            key,
+            category,
+            text,
+            ticker.strip().upper()[:32] if ticker else None,
+        )
+        return {"saved": memory is not None, "key": key}
+
+    @tool
+    async def forget_memory(memory_key: str, runtime: ToolRuntime[AgentContext]) -> dict:
+        """Deactivate durable context that the user explicitly retracted or corrected."""
+        if runtime.context.trigger != "inbound":
+            return {"error": "memory_writes_require_inbound_message"}
+        key = memory_key.strip().lower()[:120]
+        return {
+            "forgotten": await crud.forget_memory(UUID(runtime.context.user_id), key),
+            "key": key,
+        }
+
     return [
         get_portfolio,
         get_market_signals,
         get_company_events,
         get_earnings,
         set_morning_brief_time,
+        save_memory,
+        forget_memory,
     ]
 
 

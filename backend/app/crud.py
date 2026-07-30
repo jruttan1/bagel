@@ -14,6 +14,7 @@ from sqlalchemy.orm import selectinload
 
 from app.db import SessionLocal
 from app.models import (
+    AgentMemory,
     BrokerageAccount,
     ConnectionStatus,
     ConnectionToken,
@@ -273,6 +274,62 @@ async def upsert_thesis(user_id: UUID, ticker: str, values: dict) -> InvestmentT
                 setattr(thesis, key, value)
         await session.commit()
         return thesis
+
+
+async def active_memories(user_id: UUID, limit: int = 60) -> list[AgentMemory]:
+    async with SessionLocal() as session:
+        rows = await session.scalars(
+            select(AgentMemory)
+            .where(AgentMemory.user_id == user_id, AgentMemory.is_active.is_(True))
+            .order_by(AgentMemory.updated_at.desc())
+            .limit(limit)
+        )
+        return list(rows)
+
+
+async def upsert_memory(
+    user_id: UUID,
+    memory_key: str,
+    category: str,
+    summary: str,
+    ticker: str | None = None,
+) -> AgentMemory | None:
+    async with SessionLocal() as session:
+        if await session.get(User, user_id) is None:
+            return None
+        memory = await session.scalar(
+            select(AgentMemory).where(
+                AgentMemory.user_id == user_id,
+                AgentMemory.memory_key == memory_key,
+            )
+        )
+        if memory is None:
+            memory = AgentMemory(user_id=user_id, memory_key=memory_key)
+            session.add(memory)
+        memory.category = category
+        memory.summary = summary
+        memory.ticker = ticker
+        memory.source = "conversation"
+        memory.is_active = True
+        await session.commit()
+        await session.refresh(memory)
+        return memory
+
+
+async def forget_memory(user_id: UUID, memory_key: str) -> bool:
+    async with SessionLocal() as session:
+        memory = await session.scalar(
+            select(AgentMemory).where(
+                AgentMemory.user_id == user_id,
+                AgentMemory.memory_key == memory_key,
+                AgentMemory.is_active.is_(True),
+            )
+        )
+        if memory is None:
+            return False
+        memory.is_active = False
+        await session.commit()
+        return True
 
 
 async def connection(user_id: UUID) -> WealthsimpleConnection | None:

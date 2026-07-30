@@ -178,6 +178,21 @@ class InvestmentThesis(Base):
     user: Mapped[User] = relationship(back_populates="theses")
 
 
+class AgentMemory(Base):
+    __tablename__ = "agent_memories"
+    __table_args__ = (UniqueConstraint("user_id", "memory_key"),)
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    memory_key: Mapped[str] = mapped_column(String(120))
+    category: Mapped[str] = mapped_column(String(32), index=True)
+    summary: Mapped[str] = mapped_column(Text)
+    ticker: Mapped[str | None] = mapped_column(String(32), index=True)
+    source: Mapped[str] = mapped_column(String(32), default="conversation")
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+
 class OnboardingAnswer(Base):
     __tablename__ = "onboarding_answers"
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
