@@ -1,5 +1,8 @@
+from contextlib import asynccontextmanager
+
 import pytest
 from langchain_core.messages import AIMessage, ToolMessage
+from langgraph.checkpoint.memory import InMemorySaver
 
 from app.agent import _checkpoint_database_uri, _evidence, agent_runtime
 from app.config import Settings
@@ -12,11 +15,23 @@ class FakeMarket:
 
 
 @pytest.mark.asyncio
-async def test_runtime_builds_stateful_agent(tmp_path) -> None:
+async def test_runtime_builds_stateful_agent(monkeypatch) -> None:
+    class Checkpointer(InMemorySaver):
+        async def setup(self) -> None:
+            pass
+
+    @asynccontextmanager
+    async def fake_saver(_uri):
+        yield Checkpointer()
+
+    monkeypatch.setattr(
+        "app.agent.AsyncPostgresSaver.from_conn_string",
+        fake_saver,
+    )
     settings = Settings(
         _env_file=None,
         openai_api_key="test",
-        agent_checkpoint_path=str(tmp_path / "agent.db"),
+        database_url="postgresql+asyncpg://user:pass@example.com/bagel?ssl=require",
     )
     async with agent_runtime(settings, FakeMarket()) as agent:
         assert {"model", "tools"}.issubset(agent.graph.nodes)
@@ -56,6 +71,11 @@ def test_checkpoint_uri_is_psycopg_compatible() -> None:
     )
 
     assert uri == "postgresql://user:pass@example.com/db?sslmode=require"
+
+
+def test_checkpoint_uri_rejects_sqlite() -> None:
+    with pytest.raises(RuntimeError, match="Neon/Postgres"):
+        _checkpoint_database_uri("sqlite+aiosqlite:///bagel.db")
 
 
 @pytest.mark.parametrize(

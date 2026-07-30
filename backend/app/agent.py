@@ -16,7 +16,6 @@ from langchain.tools import ToolRuntime, tool
 from langchain_core.messages import AIMessage, ToolMessage
 from langchain_openai import ChatOpenAI
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
-from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 
 from app import crud
 from app.config import Settings
@@ -138,19 +137,16 @@ class BagelAgent:
 
 @asynccontextmanager
 async def agent_runtime(settings: Settings, market: MarketDataClient):
-    if settings.database_url.startswith("postgresql"):
-        uri = _checkpoint_database_uri(settings.database_url)
-        async with AsyncPostgresSaver.from_conn_string(uri) as checkpointer:
-            await checkpointer.setup()
-            yield BagelAgent(settings, market, checkpointer)
-        return
-    async with AsyncSqliteSaver.from_conn_string(settings.agent_checkpoint_path) as checkpointer:
+    uri = _checkpoint_database_uri(settings.database_url)
+    async with AsyncPostgresSaver.from_conn_string(uri) as checkpointer:
         await checkpointer.setup()
         yield BagelAgent(settings, market, checkpointer)
 
 
 def _checkpoint_database_uri(database_url: str) -> str:
     """Translate the application's asyncpg URL into a psycopg-compatible URL."""
+    if not database_url.startswith(("postgresql://", "postgresql+asyncpg://")):
+        raise RuntimeError("DATABASE_URL must point to Neon/Postgres")
     parsed = urlsplit(database_url.replace("postgresql+asyncpg://", "postgresql://", 1))
     query = dict(parse_qsl(parsed.query, keep_blank_values=True))
     if "ssl" in query and "sslmode" not in query:
