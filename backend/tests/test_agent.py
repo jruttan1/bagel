@@ -4,7 +4,7 @@ import pytest
 from langchain_core.messages import AIMessage, ToolMessage
 from langgraph.checkpoint.memory import InMemorySaver
 
-from app.agent import _checkpoint_database_uri, _evidence, agent_runtime
+from app.agent import AGENT_INSTRUCTIONS, _checkpoint_database_uri, _evidence, agent_runtime
 from app.config import Settings
 from app.intelligence import IntelligenceUnavailable, _validate_draft
 from app.schemas import MessageDraft
@@ -12,6 +12,10 @@ from app.schemas import MessageDraft
 
 class FakeMarket:
     pass
+
+
+def test_prompt_keeps_memory_implicit() -> None:
+    assert "Never explicitly cite, quote, mention, or refer to saved memories" in AGENT_INSTRUCTIONS
 
 
 @pytest.mark.asyncio
