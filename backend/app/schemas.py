@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Any, Literal
+from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, Field, field_validator
@@ -47,11 +47,12 @@ class ThesisUpsertRequest(BaseModel):
         return value.strip().upper()
 
 
-class MessagesWebhook(BaseModel):
-    event: str
-    data: dict[str, Any]
-    timestamp: int
+class SpectrumInboundMessage(BaseModel):
     delivery_id: str
+    provider_message_id: str
+    sender: str
+    text: str = Field(min_length=1, max_length=10000)
+    timestamp: datetime | None = None
 
 
 class MessageSendResult(BaseModel):

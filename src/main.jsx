@@ -39,10 +39,11 @@ function App() {
       const body = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(body.detail || 'Could not start the conversation.');
       if (body.status === 'needs_first_message') {
+        const href = body.line_handle ? `sms:${body.line_handle}&body=Hey%20Bagel` : '';
         setSuccessCopy({
           title: 'Send Bagel a text',
-          detail: 'Send any message first to open the conversation.',
-          href: body.line_handle ? `sms:${body.line_handle}` : '',
+          detail: 'One text opens your private conversation.',
+          href,
         });
       } else {
         setSuccessCopy({ title: 'Check your texts', detail: 'Bagel will take it from here.', href: '' });
@@ -97,7 +98,7 @@ function App() {
               <small id={phoneError ? 'phone-error' : undefined} className={phoneError ? 'phone-error' : ''} role={phoneError ? 'alert' : undefined}>{phoneError || (sending ? 'Starting your conversation…' : 'Start a private conversation with Bagel.')}</small>
             </div>
             <div className="success-wrap" role="status" aria-live="polite" aria-hidden={!sent}>
-              <span className="success-kicker">Message sent</span>
+              <span className="success-kicker">Conversation ready</span>
               <div className="success-card"><span className="success-check"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5.5 12.5 4 4 9-9"/></svg></span><div><strong>{successCopy.href ? <a href={successCopy.href}>{successCopy.title}</a> : successCopy.title}</strong><small>{successCopy.detail}</small></div></div>
             </div>
           </div>

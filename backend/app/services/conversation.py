@@ -7,7 +7,7 @@ from app.phone import InvalidPhoneNumber, normalize_phone
 from app.repositories import get_user_by_phone, latest_snapshot, recent_messages
 from app.services.connections import ConnectionLinkService
 from app.services.intelligence import IntelligenceService, IntelligenceUnavailable
-from app.services.messages import MessagesDevClient
+from app.services.messages import SpectrumBridgeClient
 from app.services.onboarding import OnboardingService
 
 
@@ -18,7 +18,7 @@ class UnsupportedInboundMessage(ValueError):
 class ConversationService:
     def __init__(
         self,
-        messages: MessagesDevClient,
+        messages: SpectrumBridgeClient,
         intelligence: IntelligenceService,
         onboarding: OnboardingService,
         connection_links: ConnectionLinkService,
@@ -31,7 +31,7 @@ class ConversationService:
     async def welcome(self, session: AsyncSession, user: User) -> str:
         token = await self.connection_links.issue(session, user)
         text = (
-            "Your morning Bagel starts here. Connect Wealthsimple securely, then I’ll learn "
+            "Thanks for joining! Connect your Brokerage, then I’ll learn "
             f"what matters to you in a few texts: {self.connection_links.url(token)}"
         )
         await self.send_and_record(session, user, text)

@@ -1,3 +1,4 @@
+# Cron to run each morning
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from app.services.briefs import BriefService

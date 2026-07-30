@@ -16,7 +16,7 @@ from app.services.connections import ConnectionLinkService
 from app.services.conversation import ConversationService
 from app.services.intelligence import IntelligenceService
 from app.services.market_data import MarketDataClient
-from app.services.messages import MessagesDevClient
+from app.services.messages import SpectrumBridgeClient
 from app.services.onboarding import OnboardingService
 from app.services.wealthsimple import WealthsimpleService
 
@@ -31,7 +31,7 @@ async def lifespan(app: FastAPI):
         async with engine.begin() as connection:
             await connection.run_sync(Base.metadata.create_all)
 
-    messages = MessagesDevClient(settings)
+    messages = SpectrumBridgeClient(settings)
     intelligence = IntelligenceService(settings)
     onboarding = OnboardingService(intelligence)
     connection_links = ConnectionLinkService(settings)

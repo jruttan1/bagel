@@ -1,7 +1,5 @@
-import hashlib
 import hmac
 import json
-import time
 from typing import Any
 
 from cryptography.fernet import Fernet, InvalidToken
@@ -38,26 +36,6 @@ class SecretBox:
 
     def decrypt_json(self, token: str) -> Any:
         return json.loads(self.decrypt_text(token))
-
-
-def verify_messages_webhook(
-    raw_body: bytes,
-    signature: str,
-    timestamp_ms: str,
-    secret: str,
-    tolerance_seconds: int = 300,
-) -> bool:
-    if not all((signature, timestamp_ms, secret)):
-        return False
-    try:
-        timestamp = int(timestamp_ms)
-    except ValueError:
-        return False
-    if abs((time.time() * 1000) - timestamp) > tolerance_seconds * 1000:
-        return False
-    payload = timestamp_ms.encode() + b"." + raw_body
-    expected = hmac.new(secret.encode(), payload, hashlib.sha256).hexdigest()
-    return hmac.compare_digest(expected, signature.lower())
 
 
 def constant_time_equal(left: str, right: str) -> bool:

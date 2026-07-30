@@ -8,7 +8,7 @@ from app.models import Holding, MarketEvent, MorningBrief, User
 from app.repositories import get_user, latest_snapshot, previous_snapshot
 from app.services.intelligence import IntelligenceService, IntelligenceUnavailable
 from app.services.market_data import MarketDataClient
-from app.services.messages import MessagesDevClient
+from app.services.messages import SpectrumBridgeClient
 from app.services.wealthsimple import WealthsimpleIntegrationError, WealthsimpleService
 
 
@@ -19,7 +19,7 @@ class BriefService:
         wealthsimple: WealthsimpleService,
         intelligence: IntelligenceService,
         market_data: MarketDataClient,
-        messages: MessagesDevClient,
+        messages: SpectrumBridgeClient,
     ):
         self.session_factory = session_factory
         self.wealthsimple = wealthsimple
