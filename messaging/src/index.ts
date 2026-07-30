@@ -1,7 +1,7 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { timingSafeEqual } from "node:crypto";
 
-import { Spectrum } from "spectrum-ts";
+import { markdown, Spectrum } from "spectrum-ts";
 import { imessage } from "@spectrum-ts/imessage";
 
 const projectId = required("PROJECT_ID");
@@ -37,7 +37,7 @@ const server = createServer(async (request, response) => {
 
     if (request.url === "/messages") {
       const text = stringField(body, "text");
-      const sent = await space.send(text);
+      const sent = await space.send(body.format === "markdown" ? markdown(text) : text);
       return json(response, 200, { id: sent?.id ?? crypto.randomUUID(), status: "sent" });
     }
     if (request.url === "/typing") {
