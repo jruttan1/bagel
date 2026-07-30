@@ -38,11 +38,18 @@ async def send_for_user(
     prior = await crud.previous_snapshot(user.id, snapshot.captured_at)
     earnings = await earnings_for_snapshot(market, snapshot)
     try:
-        content = await intelligence.morning_brief(user, snapshot, prior, list(user.theses), earnings)
+        draft = await intelligence.morning_brief(user, snapshot, prior, list(user.theses), earnings)
     except IntelligenceUnavailable:
         return False
-    result = await messages.send(settings, user.phone_number, content, client=http)
-    await crud.record_brief(user.id, local_date, snapshot.id, content, result.id)
+    result = await messages.send(settings, user.phone_number, draft, client=http)
+    await crud.record_brief(
+        user.id,
+        local_date,
+        snapshot.id,
+        draft.text,
+        result.id,
+        evidence=draft._evidence,
+    )
     return True
 
 

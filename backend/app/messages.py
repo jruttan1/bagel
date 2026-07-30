@@ -1,5 +1,6 @@
 """Bagel's complete messaging and conversational interface."""
 
+import re
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Any, Protocol
@@ -10,11 +11,11 @@ from app import crud
 from app.config import Settings
 from app.models import OnboardingStep, User
 from app.phone import InvalidPhoneNumber, normalize_phone
-from app.schemas import MessageSendResult
+from app.schemas import MessageDraft, MessageSendResult
 
 
 class Intelligence(Protocol):
-    async def reply(self, user, text, snapshot, theses, history) -> str: ...
+    async def reply(self, user, text, snapshot, theses, history) -> MessageDraft | str: ...
     async def onboarding_question(self, category, snapshot) -> str: ...
     async def distill_profile(self, answers, snapshot) -> dict: ...
 
@@ -51,12 +52,16 @@ FALLBACK_QUESTIONS = {
 async def send(
     settings: Settings,
     to: str,
-    text: str,
+    message: MessageDraft | str,
     *,
     reply_to: str | None = None,
     client: httpx.AsyncClient | None = None,
 ) -> MessageSendResult:
-    payload: dict[str, Any] = {"to": to, "text": text}
+    draft = _draft(message)
+    formatted = _native_message(draft)
+    payload: dict[str, Any] = {"to": to, "text": formatted or draft.text}
+    if formatted:
+        payload["format"] = "markdown"
     if reply_to:
         payload["replyTo"] = reply_to
     return MessageSendResult.model_validate(await _post(settings, "/messages", payload, client))
@@ -108,14 +113,23 @@ async def typing(
 async def send_and_record(
     settings: Settings,
     user: User,
-    text: str,
+    message: MessageDraft | str,
     *,
     reply_to: str | None = None,
     client: httpx.AsyncClient | None = None,
 ) -> MessageSendResult:
-    result = await send(settings, user.phone_number, text, reply_to=reply_to, client=client)
+    draft = _draft(message)
+    result = await send(settings, user.phone_number, draft, reply_to=reply_to, client=client)
     await crud.record_outbound(
-        user.id, text, result.id, {"status": result.status, "request_id": result.request_id}
+        user.id,
+        draft.text,
+        result.id,
+        {
+            "status": result.status,
+            "request_id": result.request_id,
+            "emphasis_phrase": draft.emphasis_phrase,
+            "evidence": draft._evidence,
+        },
     )
     return result
 
@@ -156,12 +170,17 @@ async def handle_inbound(
         if user.onboarding_step != OnboardingStep.complete:
             reply = await handle_answer(intelligence, user, text)
         else:
-            snapshot = await crud.latest_snapshot(user.id)
-            history = await crud.recent_messages(user.id)
-            try:
-                reply = await intelligence.reply(user, text, snapshot, list(user.theses), history)
-            except Exception:
-                reply = "I can see your message, but my market analysis is temporarily unavailable."
+            requested_time = parse_brief_time(text)
+            if requested_time:
+                await crud.set_brief_time(user.id, requested_time)
+                reply = f"Got it — your morning Bagel will come at {_display_time(requested_time)}."
+            else:
+                snapshot = await crud.latest_snapshot(user.id)
+                history = await crud.recent_messages(user.id)
+                try:
+                    reply = await intelligence.reply(user, text, snapshot, list(user.theses), history)
+                except Exception:
+                    reply = "I can see your message, but my market analysis is temporarily unavailable."
         await send_and_record(settings, user, reply, reply_to=provider_id, client=client)
 
 
@@ -242,3 +261,53 @@ def _safe_json(response: httpx.Response) -> dict:
         return value if isinstance(value, dict) else {}
     except ValueError:
         return {}
+
+
+def parse_brief_time(text: str) -> str | None:
+    if not re.search(r"\b(bagel|brief|message|text|send|morning)\b", text, re.IGNORECASE):
+        return None
+    match = re.search(
+        r"\b(?:at|around|for)\s+(\d{1,2})(?::([0-5]\d))?\s*(a\.?m\.?|p\.?m\.?)?\b",
+        text,
+        re.IGNORECASE,
+    )
+    if match is None:
+        return None
+    hour = int(match.group(1))
+    minute = int(match.group(2) or 0)
+    meridiem = (match.group(3) or "").lower().replace(".", "")
+    if meridiem:
+        if not 1 <= hour <= 12:
+            return None
+        hour = hour % 12 + (12 if meridiem == "pm" else 0)
+    elif hour > 23:
+        return None
+    return f"{hour:02d}:{minute:02d}"
+
+
+def _display_time(value: str) -> str:
+    hour, minute = (int(part) for part in value.split(":", 1))
+    suffix = "a.m." if hour < 12 else "p.m."
+    display_hour = hour % 12 or 12
+    return f"{display_hour}:{minute:02d} {suffix}"
+
+
+def _draft(message: MessageDraft | str) -> MessageDraft:
+    return message if isinstance(message, MessageDraft) else MessageDraft(text=message)
+
+
+def _native_message(draft: MessageDraft) -> str | None:
+    phrase = draft.emphasis_phrase
+    if not phrase or phrase not in draft.text:
+        return None
+    start = draft.text.index(phrase)
+    end = start + len(phrase)
+    return (
+        _escape_markdown(draft.text[:start])
+        + f"**{_escape_markdown(phrase)}**"
+        + _escape_markdown(draft.text[end:])
+    )
+
+
+def _escape_markdown(value: str) -> str:
+    return re.sub(r"([\\`*_{}\[\]()<>#+.!|~-])", r"\\\1", value)

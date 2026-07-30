@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, field_validator
 
 
 class SignupRequest(BaseModel):
@@ -77,6 +77,7 @@ class HealthResponse(BaseModel):
 
 
 class MarketSignal(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     ticker: str
     name: str | None = None
     portfolio_weight: float = 0
@@ -92,6 +93,7 @@ class MarketSignal(BaseModel):
 
 
 class EvidenceClaim(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     text: str
     kind: Literal["price", "business", "event", "market_narrative"]
     tickers: list[str] = Field(default_factory=list)
@@ -99,6 +101,7 @@ class EvidenceClaim(BaseModel):
 
 
 class ResearchAnalysis(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     material_change: bool
     lead_tickers: list[str] = Field(default_factory=list)
     facts: list[EvidenceClaim] = Field(default_factory=list)
@@ -110,5 +113,16 @@ class ResearchAnalysis(BaseModel):
 
 
 class MessageDraft(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     text: str = Field(min_length=1, max_length=1800)
     emphasis_phrase: str | None = Field(default=None, max_length=100)
+    _evidence: dict = PrivateAttr(default_factory=dict)
+
+
+class ResearchPlan(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    needs_current_research: bool
+    tickers: list[str] = Field(default_factory=list)
+    question: str | None = None

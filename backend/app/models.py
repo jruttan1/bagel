@@ -253,5 +253,6 @@ class MorningBrief(Base):
     brief_date: Mapped[date] = mapped_column(Date)
     snapshot_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("portfolio_snapshots.id"))
     content: Mapped[str] = mapped_column(Text)
+    evidence_data: Mapped[dict] = mapped_column(json_dict_type(), default=dict)
     provider_outbox_id: Mapped[str | None] = mapped_column(String(160))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

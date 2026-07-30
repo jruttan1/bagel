@@ -28,10 +28,10 @@ async def lifespan(app: FastAPI):
         async with engine.begin() as connection:
             await connection.run_sync(Base.metadata.create_all)
 
-    intelligence = IntelligenceService(settings)
+    market_data = MarketDataClient(settings)
+    intelligence = IntelligenceService(settings, market_data)
     secret_box = SecretBox(settings.encryption_key) if settings.encryption_key else None
     wealthsimple = WealthsimpleService(secret_box) if secret_box else None
-    market_data = MarketDataClient(settings)
     http = httpx.AsyncClient(base_url=settings.spectrum_bridge_url, timeout=20)
 
     app.state.http = http

@@ -426,7 +426,12 @@ async def brief_exists(user_id: UUID, brief_date: date) -> bool:
 
 
 async def record_brief(
-    user_id: UUID, brief_date: date, snapshot_id: UUID, content: str, provider_id: str
+    user_id: UUID,
+    brief_date: date,
+    snapshot_id: UUID,
+    content: str,
+    provider_id: str,
+    evidence: dict | None = None,
 ) -> None:
     async with SessionLocal() as session:
         session.add(
@@ -435,6 +440,7 @@ async def record_brief(
                 brief_date=brief_date,
                 snapshot_id=snapshot_id,
                 content=content,
+                evidence_data=evidence or {},
                 provider_outbox_id=provider_id,
             )
         )
