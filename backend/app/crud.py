@@ -26,6 +26,7 @@ from app.models import (
     OnboardingAnswer,
     OnboardingStep,
     PortfolioSnapshot,
+    ResearchCache,
     Transaction,
     User,
     WealthsimpleConnection,
@@ -461,6 +462,40 @@ async def add_events(rows: list[dict]) -> int:
                 inserted += 1
         await session.commit()
     return inserted
+
+
+async def cached_research(cache_key: str) -> dict | None:
+    async with SessionLocal() as session:
+        row = await session.get(ResearchCache, cache_key)
+        if row is None or _utc(row.expires_at) <= datetime.now(UTC):
+            if row is not None:
+                await session.delete(row)
+                await session.commit()
+            return None
+        return dict(row.payload)
+
+
+async def cache_research(cache_key: str, payload: dict, ttl_minutes: int = 90) -> None:
+    async with SessionLocal() as session:
+        row = await session.get(ResearchCache, cache_key)
+        if row is None:
+            row = ResearchCache(cache_key=cache_key)
+            session.add(row)
+        row.payload = payload
+        row.expires_at = datetime.now(UTC) + timedelta(minutes=ttl_minutes)
+        await session.commit()
+
+
+async def set_brief_time(user_id: UUID, brief_time: str) -> User:
+    async with SessionLocal() as session:
+        user = await session.get(User, user_id)
+        if user is None:
+            raise LookupError("User not found")
+        settings = dict(user.notification_settings)
+        settings["brief_time"] = brief_time
+        user.notification_settings = settings
+        await session.commit()
+        return user
 
 
 async def _historical(session, user_id: UUID, history: list[dict]) -> None:

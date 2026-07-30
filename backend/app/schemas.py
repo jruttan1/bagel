@@ -74,3 +74,41 @@ class SyncResult(BaseModel):
 class HealthResponse(BaseModel):
     status: str
     database: str | None = None
+
+
+class MarketSignal(BaseModel):
+    ticker: str
+    name: str | None = None
+    portfolio_weight: float = 0
+    regular_price: float | None = None
+    regular_change_percent: float | None = None
+    extended_price: float | None = None
+    extended_change_percent: float | None = None
+    estimated_portfolio_effect: float = 0
+    session: Literal["regular", "premarket", "afterhours", "closed"]
+    observed_at: datetime
+    is_fresh: bool
+    rank_score: float = 0
+
+
+class EvidenceClaim(BaseModel):
+    text: str
+    kind: Literal["price", "business", "event", "market_narrative"]
+    tickers: list[str] = Field(default_factory=list)
+    confidence: Literal["low", "medium", "high"]
+
+
+class ResearchAnalysis(BaseModel):
+    material_change: bool
+    lead_tickers: list[str] = Field(default_factory=list)
+    facts: list[EvidenceClaim] = Field(default_factory=list)
+    interpretations: list[EvidenceClaim] = Field(default_factory=list)
+    thesis_effect: str | None = None
+    next_evidence: str | None = None
+    avoid_claims: list[str] = Field(default_factory=list)
+    source_urls: list[str] = Field(default_factory=list)
+
+
+class MessageDraft(BaseModel):
+    text: str = Field(min_length=1, max_length=1800)
+    emphasis_phrase: str | None = Field(default=None, max_length=100)
