@@ -4,8 +4,9 @@ from uuid import uuid4
 import pytest
 from sqlalchemy import select
 
+from app.crud import _historical
 from app.models import PortfolioSnapshot, User
-from app.services.wealthsimple import _normalize_position, _persist_historical_snapshots
+from app.wealthsimple import _normalize_position
 
 
 def test_normalizes_ws_api_position() -> None:
@@ -39,9 +40,9 @@ async def test_imports_historical_portfolio_values_once(session) -> None:
             }
         }
     ]
-    await _persist_historical_snapshots(session, user.id, history)
+    await _historical(session, user.id, history)
     await session.commit()
-    await _persist_historical_snapshots(session, user.id, history)
+    await _historical(session, user.id, history)
     await session.commit()
 
     rows = (

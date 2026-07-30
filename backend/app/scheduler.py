@@ -1,13 +1,11 @@
 # Cron to run each morning
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
-from app.services.briefs import BriefService
 
-
-def build_scheduler(briefs: BriefService) -> AsyncIOScheduler:
+def build_scheduler(run_briefs, refresh_events) -> AsyncIOScheduler:
     scheduler = AsyncIOScheduler(timezone="UTC")
     scheduler.add_job(
-        briefs.run_due,
+        run_briefs,
         "interval",
         minutes=10,
         id="morning-briefs",
@@ -15,7 +13,7 @@ def build_scheduler(briefs: BriefService) -> AsyncIOScheduler:
         coalesce=True,
     )
     scheduler.add_job(
-        briefs.refresh_earnings_calendar,
+        refresh_events,
         "cron",
         hour="*/6",
         id="earnings-calendar",

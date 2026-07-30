@@ -1,10 +1,9 @@
 from fastapi import APIRouter, HTTPException, Request
 
-from app.dependencies import DbSession
-from app.models import OnboardingStep
+from app import crud, messages
+from app.config import get_settings
 from app.schemas import ConnectionTokenStatus, WealthsimpleConnectRequest, WealthsimpleConnectResponse
-from app.services.connections import InvalidConnectionToken
-from app.services.wealthsimple import (
+from app.wealthsimple import (
     WealthsimpleIntegrationError,
     WealthsimpleOTPRequired,
 )
@@ -16,12 +15,11 @@ router = APIRouter(prefix="/wealthsimple", tags=["wealthsimple"])
 async def connection_status(
     token: str,
     request: Request,
-    session: DbSession,
 ) -> ConnectionTokenStatus:
-    try:
-        _, user = await request.app.state.connection_links.resolve(session, token)
-    except InvalidConnectionToken:
+    resolved = await crud.resolve_token(token)
+    if resolved is None:
         return ConnectionTokenStatus(valid=False)
+    _, user = resolved
     return ConnectionTokenStatus(valid=True, phone_hint=f"••• ••• {user.phone_number[-4:]}")
 
 
@@ -29,16 +27,16 @@ async def connection_status(
 async def connect(
     payload: WealthsimpleConnectRequest,
     request: Request,
-    session: DbSession,
 ) -> WealthsimpleConnectResponse:
     if request.app.state.wealthsimple is None:
         raise HTTPException(status_code=503, detail="Credential encryption is not configured")
     try:
-        link, user = await request.app.state.connection_links.resolve(session, payload.token)
-        await request.app.state.wealthsimple.connect(
-            session, user.id, payload.username, payload.password, payload.otp
-        )
-    except InvalidConnectionToken as exc:
+        resolved = await crud.resolve_token(payload.token)
+        if resolved is None:
+            raise ValueError("This connection link is invalid or has expired")
+        link, user = resolved
+        await request.app.state.wealthsimple.connect(user.id, payload.username, payload.password, payload.otp)
+    except ValueError as exc:
         raise HTTPException(status_code=401, detail=str(exc)) from exc
     except WealthsimpleOTPRequired:
         return WealthsimpleConnectResponse(status="otp_required")
@@ -46,13 +44,14 @@ async def connect(
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     try:
-        await request.app.state.wealthsimple.sync_user(session, user.id)
+        await request.app.state.wealthsimple.sync_user(user.id)
     except WealthsimpleIntegrationError as exc:
         raise HTTPException(status_code=502, detail="Connected, but the first sync failed") from exc
 
-    link.used_at = request.app.state.utcnow()
-    user.onboarding_step = OnboardingStep.financial_position
-    await session.commit()
-    question = await request.app.state.onboarding.question_for(session, user)
-    await request.app.state.conversations.send_and_record(session, user, question)
+    await crud.consume_token(link.id, user.id)
+    user = await crud.user_by_id(user.id)
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    question = await messages.question_for(request.app.state.intelligence, user)
+    await messages.send_and_record(get_settings(), user, question, client=request.app.state.http)
     return WealthsimpleConnectResponse(status="connected")

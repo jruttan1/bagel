@@ -2,12 +2,11 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from fastapi import APIRouter, HTTPException, Request, status
 
-from app.dependencies import DbSession
-from app.models import ConnectionStatus, OnboardingStep, User
+from app import crud, messages
+from app.config import get_settings
+from app.models import ConnectionStatus, OnboardingStep
 from app.phone import InvalidPhoneNumber, normalize_phone
-from app.repositories import get_user_by_phone
 from app.schemas import SignupRequest, SignupResponse
-from app.services.messages import MessagingError
 
 router = APIRouter(tags=["signup"])
 
@@ -16,7 +15,6 @@ router = APIRouter(tags=["signup"])
 async def signup(
     payload: SignupRequest,
     request: Request,
-    session: DbSession,
 ) -> SignupResponse:
     try:
         phone = normalize_phone(payload.phone_number)
@@ -24,13 +22,9 @@ async def signup(
     except (InvalidPhoneNumber, ZoneInfoNotFoundError) as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
-    user = await get_user_by_phone(session, phone)
-    existing = user is not None
-    if user is None:
-        user = User(phone_number=phone, timezone=payload.timezone)
-        session.add(user)
-        await session.commit()
-        await session.refresh(user)
+    user, created = await crud.get_or_create_user(phone, payload.timezone)
+    existing = not created
+    settings = get_settings()
 
     if (
         existing
@@ -39,19 +33,22 @@ async def signup(
         and user.onboarding_step != OnboardingStep.awaiting_connection
     ):
         try:
-            await request.app.state.conversations.send_and_record(
-                session, user, "You’re already connected. Just text me whenever you want to talk investments."
+            await messages.send_and_record(
+                settings,
+                user,
+                "You’re already connected. Just text me whenever you want to talk investments.",
+                client=request.app.state.http,
             )
-        except MessagingError:
+        except messages.MessagingError:
             return SignupResponse(
                 user_id=user.id,
                 status="needs_first_message",
-                line_handle=request.app.state.messages.settings.spectrum_shared_number or None,
+                line_handle=settings.spectrum_shared_number or None,
             )
         return SignupResponse(user_id=user.id, status="already_registered")
 
     return SignupResponse(
         user_id=user.id,
         status="needs_first_message",
-        line_handle=request.app.state.messages.settings.spectrum_shared_number or None,
+        line_handle=settings.spectrum_shared_number or None,
     )

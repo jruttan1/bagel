@@ -1,15 +1,11 @@
 import logging
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Request, status
-from sqlalchemy.exc import IntegrityError
 
+from app import crud, messages
 from app.config import get_settings
-from app.db import SessionLocal
-from app.dependencies import DbSession
-from app.models import WebhookDelivery
 from app.schemas import SpectrumInboundMessage
 from app.security import constant_time_equal
-from app.services.conversation import UnsupportedInboundMessage
 
 router = APIRouter(tags=["webhooks"])
 logger = logging.getLogger("bagel.webhooks")
@@ -20,7 +16,6 @@ async def spectrum_inbound(
     payload: SpectrumInboundMessage,
     request: Request,
     background_tasks: BackgroundTasks,
-    session: DbSession,
 ) -> dict[str, str]:
     settings = get_settings()
     authorization = request.headers.get("Authorization", "")
@@ -34,11 +29,7 @@ async def spectrum_inbound(
     if not authorized:
         raise HTTPException(status_code=401, detail="Invalid bridge token")
 
-    session.add(WebhookDelivery(delivery_id=payload.delivery_id, event_name="message.received"))
-    try:
-        await session.commit()
-    except IntegrityError:
-        await session.rollback()
+    if not await crud.register_delivery(payload.delivery_id):
         return {"status": "duplicate"}
 
     data = {
@@ -47,15 +38,20 @@ async def spectrum_inbound(
         "text": payload.text,
         "created_at": payload.timestamp.isoformat() if payload.timestamp else None,
     }
-    background_tasks.add_task(_process_inbound, request.app.state.conversations, data)
+    background_tasks.add_task(
+        _process_inbound,
+        settings,
+        request.app.state.intelligence,
+        request.app.state.http,
+        data,
+    )
     return {"status": "queued"}
 
 
-async def _process_inbound(conversations, data: dict) -> None:
-    async with SessionLocal() as session:
-        try:
-            await conversations.handle_inbound(session, data)
-        except UnsupportedInboundMessage:
-            logger.info("Ignoring unsupported inbound message")
-        except Exception:
-            logger.exception("Inbound message processing failed")
+async def _process_inbound(settings, intelligence, http, data: dict) -> None:
+    try:
+        await messages.handle_inbound(settings, intelligence, data, client=http)
+    except messages.UnsupportedInboundMessage:
+        logger.info("Ignoring unsupported inbound message")
+    except Exception:
+        logger.exception("Inbound message processing failed")

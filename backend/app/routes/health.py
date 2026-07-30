@@ -1,7 +1,6 @@
 from fastapi import APIRouter
-from sqlalchemy import text
 
-from app.dependencies import DbSession
+from app import crud
 from app.schemas import HealthResponse
 
 router = APIRouter(tags=["health"])
@@ -13,6 +12,6 @@ async def live() -> HealthResponse:
 
 
 @router.get("/health/ready", response_model=HealthResponse)
-async def ready(session: DbSession) -> HealthResponse:
-    await session.execute(text("SELECT 1"))
+async def ready() -> HealthResponse:
+    await crud.ready()
     return HealthResponse(status="ok", database="ok")

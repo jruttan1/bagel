@@ -1,8 +1,8 @@
 import httpx
 import pytest
 
+from app import messages
 from app.config import Settings
-from app.services.messages import MessagingError, SpectrumBridgeClient
 
 
 @pytest.mark.asyncio
@@ -19,7 +19,7 @@ async def test_sends_message_with_configured_line() -> None:
     async with httpx.AsyncClient(
         transport=httpx.MockTransport(handler), base_url="http://127.0.0.1:8787"
     ) as http:
-        result = await SpectrumBridgeClient(settings, http).send_message("+14165550123", "hello")
+        result = await messages.send(settings, "+14165550123", "hello", client=http)
     assert result.id == "msg_1"
 
 
@@ -35,7 +35,7 @@ async def test_surfaces_provider_error_code() -> None:
     async with httpx.AsyncClient(
         transport=httpx.MockTransport(handler), base_url="http://127.0.0.1:8787"
     ) as http:
-        with pytest.raises(MessagingError) as error:
-            await SpectrumBridgeClient(settings, http).send_message("+14165550123", "hello")
+        with pytest.raises(messages.MessagingError) as error:
+            await messages.send(settings, "+14165550123", "hello", client=http)
     assert error.value.status_code == 403
     assert error.value.code == "contact_first"
