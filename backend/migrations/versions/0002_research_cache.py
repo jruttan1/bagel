@@ -10,14 +10,18 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.create_table(
-        "research_cache",
-        sa.Column("cache_key", sa.String(length=160), primary_key=True),
-        sa.Column("payload", sa.JSON(), nullable=False),
-        sa.Column("expires_at", sa.DateTime(timezone=True), nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
-    )
-    op.create_index("ix_research_cache_expires_at", "research_cache", ["expires_at"])
+    inspector = sa.inspect(op.get_bind())
+    if not inspector.has_table("research_cache"):
+        op.create_table(
+            "research_cache",
+            sa.Column("cache_key", sa.String(length=160), primary_key=True),
+            sa.Column("payload", sa.JSON(), nullable=False),
+            sa.Column("expires_at", sa.DateTime(timezone=True), nullable=False),
+            sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
+        )
+    indexes = {index["name"] for index in sa.inspect(op.get_bind()).get_indexes("research_cache")}
+    if "ix_research_cache_expires_at" not in indexes:
+        op.create_index("ix_research_cache_expires_at", "research_cache", ["expires_at"])
 
 
 def downgrade() -> None:

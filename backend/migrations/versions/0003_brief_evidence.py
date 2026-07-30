@@ -10,10 +10,12 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.add_column(
-        "morning_briefs",
-        sa.Column("evidence_data", sa.JSON(), nullable=False, server_default=sa.text("'{}'")),
-    )
+    columns = {column["name"] for column in sa.inspect(op.get_bind()).get_columns("morning_briefs")}
+    if "evidence_data" not in columns:
+        op.add_column(
+            "morning_briefs",
+            sa.Column("evidence_data", sa.JSON(), nullable=False, server_default=sa.text("'{}'")),
+        )
 
 
 def downgrade() -> None:
