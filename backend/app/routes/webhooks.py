@@ -41,16 +41,17 @@ async def spectrum_inbound(
     background_tasks.add_task(
         _process_inbound,
         settings,
-        request.app.state.intelligence,
+        request.app.state.agent,
+        request.app.state.onboarding,
         request.app.state.http,
         data,
     )
     return {"status": "queued"}
 
 
-async def _process_inbound(settings, intelligence, http, data: dict) -> None:
+async def _process_inbound(settings, agent, onboarding, http, data: dict) -> None:
     try:
-        await messages.handle_inbound(settings, intelligence, data, client=http)
+        await messages.handle_inbound(settings, agent, onboarding, data, client=http)
     except messages.UnsupportedInboundMessage:
         logger.info("Ignoring unsupported inbound message")
     except Exception:

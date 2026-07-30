@@ -7,8 +7,8 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 import httpx
 
 from app import crud, messages
+from app.agent import AgentUnavailable, BagelAgent
 from app.config import Settings
-from app.intelligence import IntelligenceService, IntelligenceUnavailable
 from app.market import MarketDataClient
 from app.wealthsimple import WealthsimpleIntegrationError, WealthsimpleService
 
@@ -16,8 +16,7 @@ from app.wealthsimple import WealthsimpleIntegrationError, WealthsimpleService
 async def send_for_user(
     settings: Settings,
     wealthsimple: WealthsimpleService,
-    intelligence: IntelligenceService,
-    market: MarketDataClient,
+    agent: BagelAgent,
     user_id: UUID,
     *,
     http: httpx.AsyncClient | None = None,
@@ -35,11 +34,9 @@ async def send_for_user(
     snapshot = await crud.latest_snapshot(user.id)
     if snapshot is None:
         return False
-    prior = await crud.previous_snapshot(user.id, snapshot.captured_at)
-    earnings = await earnings_for_snapshot(market, snapshot)
     try:
-        draft = await intelligence.morning_brief(user, snapshot, prior, list(user.theses), earnings)
-    except IntelligenceUnavailable:
+        draft = await agent.morning_brief(user.id)
+    except AgentUnavailable:
         return False
     result = await messages.send(settings, user.phone_number, draft, client=http)
     await crud.record_brief(
@@ -56,8 +53,7 @@ async def send_for_user(
 async def run_due(
     settings: Settings,
     wealthsimple: WealthsimpleService,
-    intelligence: IntelligenceService,
-    market: MarketDataClient,
+    agent: BagelAgent,
     *,
     http: httpx.AsyncClient | None = None,
 ) -> int:
@@ -67,7 +63,7 @@ async def run_due(
             continue
         brief_time = str(user.notification_settings.get("brief_time") or "07:30")
         if _is_due(user.timezone, brief_time) and await send_for_user(
-            settings, wealthsimple, intelligence, market, user.id, http=http
+            settings, wealthsimple, agent, user.id, http=http
         ):
             sent += 1
     return sent
@@ -93,15 +89,6 @@ async def refresh_earnings_calendar(market: MarketDataClient) -> int:
             }
         )
     return await crud.add_events(events)
-
-
-async def earnings_for_snapshot(market: MarketDataClient, snapshot) -> list[dict]:
-    tickers = {holding.ticker for holding in snapshot.holdings}
-    if not tickers:
-        return []
-    start = datetime.now(UTC).date()
-    rows = await market.earnings_calendar(start, start + timedelta(days=7))
-    return [row for row in rows if str(row.get("symbol") or "").upper() in tickers]
 
 
 def _local_now(timezone_name: str) -> datetime:

@@ -92,37 +92,9 @@ class MarketSignal(BaseModel):
     rank_score: float = 0
 
 
-class EvidenceClaim(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    text: str
-    kind: Literal["price", "business", "event", "market_narrative"]
-    tickers: list[str] = Field(default_factory=list)
-    confidence: Literal["low", "medium", "high"]
-
-
-class ResearchAnalysis(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    material_change: bool
-    lead_tickers: list[str] = Field(default_factory=list)
-    facts: list[EvidenceClaim] = Field(default_factory=list)
-    interpretations: list[EvidenceClaim] = Field(default_factory=list)
-    thesis_effect: str | None = None
-    next_evidence: str | None = None
-    avoid_claims: list[str] = Field(default_factory=list)
-    source_urls: list[str] = Field(default_factory=list)
-
-
 class MessageDraft(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     text: str = Field(min_length=1, max_length=1800)
     emphasis_phrase: str | None = Field(default=None, max_length=100)
     _evidence: dict = PrivateAttr(default_factory=dict)
-
-
-class ResearchPlan(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    needs_current_research: bool
-    tickers: list[str] = Field(default_factory=list)
-    question: str | None = None

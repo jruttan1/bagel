@@ -26,7 +26,6 @@ from app.models import (
     OnboardingAnswer,
     OnboardingStep,
     PortfolioSnapshot,
-    ResearchCache,
     Transaction,
     User,
     WealthsimpleConnection,
@@ -470,26 +469,38 @@ async def add_events(rows: list[dict]) -> int:
     return inserted
 
 
-async def cached_research(cache_key: str) -> dict | None:
+async def market_events(
+    tickers: set[str], since: datetime, days: int = 14
+) -> list[dict]:
+    if not tickers:
+        return []
+    until = datetime.now(UTC) + timedelta(days=days)
     async with SessionLocal() as session:
-        row = await session.get(ResearchCache, cache_key)
-        if row is None or _utc(row.expires_at) <= datetime.now(UTC):
-            if row is not None:
-                await session.delete(row)
-                await session.commit()
-            return None
-        return dict(row.payload)
-
-
-async def cache_research(cache_key: str, payload: dict, ttl_minutes: int = 90) -> None:
-    async with SessionLocal() as session:
-        row = await session.get(ResearchCache, cache_key)
-        if row is None:
-            row = ResearchCache(cache_key=cache_key)
-            session.add(row)
-        row.payload = payload
-        row.expires_at = datetime.now(UTC) + timedelta(minutes=ttl_minutes)
-        await session.commit()
+        rows = (
+            (
+                await session.execute(
+                    select(MarketEvent)
+                    .where(
+                        MarketEvent.ticker.in_(tickers),
+                        MarketEvent.occurred_at >= since,
+                        MarketEvent.occurred_at <= until,
+                    )
+                    .order_by(MarketEvent.occurred_at)
+                )
+            )
+            .scalars()
+            .all()
+        )
+    return [
+        {
+            "ticker": row.ticker,
+            "event_type": row.event_type,
+            "occurred_at": row.occurred_at.isoformat(),
+            "headline": row.headline,
+            "summary": row.summary,
+        }
+        for row in rows
+    ]
 
 
 async def set_brief_time(user_id: UUID, brief_time: str) -> User:

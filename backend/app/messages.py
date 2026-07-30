@@ -14,8 +14,11 @@ from app.phone import InvalidPhoneNumber, normalize_phone
 from app.schemas import MessageDraft, MessageSendResult
 
 
-class Intelligence(Protocol):
-    async def reply(self, user, text, snapshot, theses, history) -> MessageDraft | str: ...
+class Agent(Protocol):
+    async def reply(self, user_id, text) -> MessageDraft: ...
+
+
+class Onboarding(Protocol):
     async def onboarding_question(self, category, snapshot) -> str: ...
     async def distill_profile(self, answers, snapshot) -> dict: ...
 
@@ -152,7 +155,8 @@ async def welcome(
 
 async def handle_inbound(
     settings: Settings,
-    intelligence: Intelligence,
+    agent: Agent,
+    onboarding: Onboarding,
     data: dict[str, Any],
     *,
     client: httpx.AsyncClient | None = None,
@@ -168,42 +172,35 @@ async def handle_inbound(
             await welcome(settings, user, client=client)
             return
         if user.onboarding_step != OnboardingStep.complete:
-            reply = await handle_answer(intelligence, user, text)
+            reply = await handle_answer(onboarding, user, text)
         else:
-            requested_time = parse_brief_time(text)
-            if requested_time:
-                await crud.set_brief_time(user.id, requested_time)
-                reply = f"Got it — your morning Bagel will come at {_display_time(requested_time)}."
-            else:
-                snapshot = await crud.latest_snapshot(user.id)
-                history = await crud.recent_messages(user.id)
-                try:
-                    reply = await intelligence.reply(user, text, snapshot, list(user.theses), history)
-                except Exception:
-                    reply = "I can see your message, but my market analysis is temporarily unavailable."
+            try:
+                reply = await agent.reply(user.id, text)
+            except Exception:
+                reply = "I can see your message, but my market analysis is temporarily unavailable."
         await send_and_record(settings, user, reply, reply_to=provider_id, client=client)
 
 
-async def question_for(intelligence: Intelligence, user: User) -> str:
+async def question_for(onboarding: Onboarding, user: User) -> str:
     snapshot = await crud.latest_snapshot(user.id)
     try:
-        question = await intelligence.onboarding_question(QUESTION_CATEGORIES[user.onboarding_step], snapshot)
+        question = await onboarding.onboarding_question(QUESTION_CATEGORIES[user.onboarding_step], snapshot)
     except Exception:
         question = FALLBACK_QUESTIONS[user.onboarding_step]
     await crud.save_question(user.id, question)
     return question
 
 
-async def handle_answer(intelligence: Intelligence, user: User, answer: str) -> str:
+async def handle_answer(onboarding: Onboarding, user: User, answer: str) -> str:
     if user.onboarding_step not in QUESTION_CATEGORIES:
-        return await question_for(intelligence, await crud.start_onboarding(user.id))
+        return await question_for(onboarding, await crud.start_onboarding(user.id))
     user = await crud.save_answer(user.id, answer)
     if user.onboarding_step != OnboardingStep.complete:
-        return await question_for(intelligence, user)
+        return await question_for(onboarding, user)
     answers = await crud.answers(user.id)
     snapshot = await crud.latest_snapshot(user.id)
     try:
-        profile = await intelligence.distill_profile(answers, snapshot)
+        profile = await onboarding.distill_profile(answers, snapshot)
     except Exception:
         profile = {"answers": answers, "summary": "Onboarding completed; profile distillation pending."}
     await crud.save_profile(user.id, profile)
@@ -261,35 +258,6 @@ def _safe_json(response: httpx.Response) -> dict:
         return value if isinstance(value, dict) else {}
     except ValueError:
         return {}
-
-
-def parse_brief_time(text: str) -> str | None:
-    if not re.search(r"\b(bagel|brief|message|text|send|morning)\b", text, re.IGNORECASE):
-        return None
-    match = re.search(
-        r"\b(?:at|around|for)\s+(\d{1,2})(?::([0-5]\d))?\s*(a\.?m\.?|p\.?m\.?)?\b",
-        text,
-        re.IGNORECASE,
-    )
-    if match is None:
-        return None
-    hour = int(match.group(1))
-    minute = int(match.group(2) or 0)
-    meridiem = (match.group(3) or "").lower().replace(".", "")
-    if meridiem:
-        if not 1 <= hour <= 12:
-            return None
-        hour = hour % 12 + (12 if meridiem == "pm" else 0)
-    elif hour > 23:
-        return None
-    return f"{hour:02d}:{minute:02d}"
-
-
-def _display_time(value: str) -> str:
-    hour, minute = (int(part) for part in value.split(":", 1))
-    suffix = "a.m." if hour < 12 else "p.m."
-    display_hour = hour % 12 or 12
-    return f"{display_hour}:{minute:02d} {suffix}"
 
 
 def _draft(message: MessageDraft | str) -> MessageDraft:

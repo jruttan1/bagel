@@ -3,8 +3,9 @@ import json
 import httpx
 import pytest
 
-from app import messages
+from app import crud, messages
 from app.config import Settings
+from app.models import OnboardingStep, User
 from app.schemas import MessageDraft
 
 
@@ -67,14 +68,44 @@ async def test_sends_native_emphasis_without_storing_markdown() -> None:
         )
 
 
-@pytest.mark.parametrize(
-    ("message", "expected"),
-    [
-        ("send my morning bagel at 9:45", "09:45"),
-        ("text me the brief at 8 pm", "20:00"),
-        ("morning message around 12 a.m.", "00:00"),
-        ("MSFT is at 500", None),
-    ],
-)
-def test_parses_brief_time_only_from_setting_requests(message: str, expected: str | None) -> None:
-    assert messages.parse_brief_time(message) == expected
+@pytest.mark.asyncio
+async def test_completed_user_inbound_runs_agent(session) -> None:
+    user = User(phone_number="+14165550123", onboarding_step=OnboardingStep.complete)
+    session.add(user)
+    await session.commit()
+
+    class FakeAgent:
+        called_with = None
+
+        async def reply(self, user_id, text):
+            self.called_with = (user_id, text)
+            return MessageDraft(text="The answer from the agent.")
+
+    class FakeOnboarding:
+        pass
+
+    sent = []
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/messages":
+            sent.append(json.loads(request.content)["text"])
+            return httpx.Response(200, json={"id": "msg-agent", "status": "sent"})
+        return httpx.Response(200, json={"status": "ok"})
+
+    agent = FakeAgent()
+    settings = Settings(_env_file=None)
+    async with httpx.AsyncClient(
+        transport=httpx.MockTransport(handler), base_url="http://127.0.0.1:8787"
+    ) as http:
+        await messages.handle_inbound(
+            settings,
+            agent,
+            FakeOnboarding(),
+            {"from": user.phone_number, "text": "What changed today?", "id": "in-1"},
+            client=http,
+        )
+
+    saved = await crud.user_by_id(user.id)
+    assert agent.called_with == (user.id, "What changed today?")
+    assert sent == ["The answer from the agent."]
+    assert saved is not None

@@ -222,14 +222,6 @@ class MarketEvent(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
-class ResearchCache(Base):
-    __tablename__ = "research_cache"
-    cache_key: Mapped[str] = mapped_column(String(160), primary_key=True)
-    payload: Mapped[dict] = mapped_column(json_dict_type(), default=dict)
-    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
-
-
 class Transaction(Base):
     __tablename__ = "transactions"
     __table_args__ = (UniqueConstraint("user_id", "provider_transaction_id"),)

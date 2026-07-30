@@ -8,9 +8,10 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from app import briefs
+from app.agent import agent_runtime
 from app.config import get_settings
 from app.db import Base, engine
-from app.intelligence import IntelligenceService
+from app.intelligence import OnboardingIntelligence
 from app.market import MarketDataClient
 from app.routes import router
 from app.scheduler import build_scheduler
@@ -29,43 +30,31 @@ async def lifespan(app: FastAPI):
             await connection.run_sync(Base.metadata.create_all)
 
     market_data = MarketDataClient(settings)
-    intelligence = IntelligenceService(settings, market_data)
+    onboarding = OnboardingIntelligence(settings)
     secret_box = SecretBox(settings.encryption_key) if settings.encryption_key else None
     wealthsimple = WealthsimpleService(secret_box) if secret_box else None
     http = httpx.AsyncClient(base_url=settings.spectrum_bridge_url, timeout=20)
 
     app.state.http = http
-    app.state.intelligence = intelligence
-    app.state.wealthsimple = wealthsimple
-    app.state.send_brief = (
-        partial(
-            briefs.send_for_user,
-            settings,
-            wealthsimple,
-            intelligence,
-            market_data,
-            http=http,
+    app.state.onboarding = onboarding
+    async with agent_runtime(settings, market_data) as agent:
+        app.state.agent = agent
+        app.state.wealthsimple = wealthsimple
+        app.state.send_brief = (
+            partial(briefs.send_for_user, settings, wealthsimple, agent, http=http)
+            if wealthsimple
+            else None
         )
-        if wealthsimple
-        else None
-    )
-    scheduler = None
-    if settings.scheduler_enabled and wealthsimple is not None:
-        scheduler = build_scheduler(
-            partial(
-                briefs.run_due,
-                settings,
-                wealthsimple,
-                intelligence,
-                market_data,
-                http=http,
-            ),
-            partial(briefs.refresh_earnings_calendar, market_data),
-        )
-        scheduler.start()
-    yield
-    if scheduler is not None:
-        scheduler.shutdown(wait=False)
+        scheduler = None
+        if settings.scheduler_enabled and wealthsimple is not None:
+            scheduler = build_scheduler(
+                partial(briefs.run_due, settings, wealthsimple, agent, http=http),
+                partial(briefs.refresh_earnings_calendar, market_data),
+            )
+            scheduler.start()
+        yield
+        if scheduler is not None:
+            scheduler.shutdown(wait=False)
     await http.aclose()
     await engine.dispose()
 

@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     app_env: Literal["development", "test", "production"] = "development"
     app_base_url: str = "http://localhost:8000"
     database_url: str = "sqlite+aiosqlite:///./bagel.db"
+    agent_checkpoint_path: str = "./bagel-agent.db"
     encryption_key: str = ""
     openai_api_key: str = ""
     openai_model: str = "gpt-5.6-sol"
