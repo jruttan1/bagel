@@ -14,16 +14,14 @@ class Settings(BaseSettings):
     encryption_key: str = ""
     openai_api_key: str = ""
     openai_model: str = "gpt-5.6-sol"
-    messages_api_key: str = ""
-    messages_line_handle: str = ""
-    messages_webhook_secret: str = ""
-    messages_api_base: str = "https://api.messages.dev"
+    spectrum_bridge_url: str = "http://127.0.0.1:8787"
+    spectrum_bridge_token: str = ""
+    spectrum_shared_number: str = ""
     admin_api_key: str = ""
     fmp_api_key: str = ""
     morning_brief_time: str = "07:30"
     scheduler_enabled: bool = True
     sync_stale_minutes: int = Field(default=15, ge=1, le=1440)
-    webhook_tolerance_seconds: int = Field(default=300, ge=30, le=900)
     max_message_chars: int = Field(default=3500, ge=500, le=10000)
     connection_link_ttl_minutes: int = Field(default=30, ge=5, le=1440)
     auto_create_tables: bool = True
@@ -43,9 +41,8 @@ class Settings(BaseSettings):
         required = {
             "ENCRYPTION_KEY": self.encryption_key,
             "OPENAI_API_KEY": self.openai_api_key,
-            "MESSAGES_API_KEY": self.messages_api_key,
-            "MESSAGES_LINE_HANDLE": self.messages_line_handle,
-            "MESSAGES_WEBHOOK_SECRET": self.messages_webhook_secret,
+            "SPECTRUM_BRIDGE_TOKEN": self.spectrum_bridge_token,
+            "SPECTRUM_SHARED_NUMBER": self.spectrum_shared_number,
             "ADMIN_API_KEY": self.admin_api_key,
         }
         missing = [name for name, value in required.items() if not value]
