@@ -2,6 +2,7 @@
 
 import sqlalchemy as sa
 from alembic import op
+from sqlalchemy.dialects import postgresql
 
 revision = "0002"
 down_revision = "0001"
@@ -15,7 +16,11 @@ def upgrade() -> None:
         op.create_table(
             "research_cache",
             sa.Column("cache_key", sa.String(length=160), primary_key=True),
-            sa.Column("payload", sa.JSON(), nullable=False),
+            sa.Column(
+                "payload",
+                sa.JSON().with_variant(postgresql.JSONB(), "postgresql"),
+                nullable=False,
+            ),
             sa.Column("expires_at", sa.DateTime(timezone=True), nullable=False),
             sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
         )

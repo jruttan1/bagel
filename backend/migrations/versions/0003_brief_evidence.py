@@ -2,6 +2,7 @@
 
 import sqlalchemy as sa
 from alembic import op
+from sqlalchemy.dialects import postgresql
 
 revision = "0003"
 down_revision = "0002"
@@ -14,7 +15,12 @@ def upgrade() -> None:
     if "evidence_data" not in columns:
         op.add_column(
             "morning_briefs",
-            sa.Column("evidence_data", sa.JSON(), nullable=False, server_default=sa.text("'{}'")),
+            sa.Column(
+                "evidence_data",
+                sa.JSON().with_variant(postgresql.JSONB(), "postgresql"),
+                nullable=False,
+                server_default=sa.text("'{}'"),
+            ),
         )
 
 
