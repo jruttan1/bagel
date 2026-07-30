@@ -12,7 +12,7 @@ from pydantic import BaseModel, ValidationError
 
 from app import crud
 from app.config import Settings
-from app.market import MarketDataClient, research_candidates
+from app.market import MarketDataClient, MarketDataUnavailable, research_candidates
 from app.models import ConversationMessage, InvestmentThesis, PortfolioSnapshot, User
 from app.prompts import (
     PROFILE_INSTRUCTIONS,
@@ -76,9 +76,17 @@ class IntelligenceService:
         analysis = None
         signals = []
         if plan.needs_current_research and snapshot is not None and self.market is not None:
-            signals = await self.market.signals(snapshot)
-            selected = [signal for signal in signals if signal.ticker in set(plan.tickers)]
-            analysis = await self._research(user, selected or research_candidates(signals), theses, [])
+            try:
+                signals = await self.market.signals(snapshot)
+                selected = [signal for signal in signals if signal.ticker in set(plan.tickers)]
+                analysis = await self._research(
+                    user, selected or research_candidates(signals), theses, []
+                )
+            except MarketDataUnavailable:
+                analysis = ResearchAnalysis(
+                    material_change=False,
+                    avoid_claims=["Current market prices are unavailable; do not infer a move or cause."],
+                )
         payload = {
             "message_kind": "direct_reply",
             "current_message": incoming_text,
@@ -103,7 +111,10 @@ class IntelligenceService:
         theses: list[InvestmentThesis],
         upcoming_events: list[dict] | None = None,
     ) -> MessageDraft:
-        signals = await self.market.signals(snapshot) if self.market is not None else []
+        try:
+            signals = await self.market.signals(snapshot) if self.market is not None else []
+        except MarketDataUnavailable as exc:
+            raise IntelligenceUnavailable("Market data is unavailable for this brief") from exc
         candidates = research_candidates(signals)
         analysis = await self._research(user, candidates, theses, upcoming_events or [])
         fallback = _brief_fallback(candidates)

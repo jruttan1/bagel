@@ -44,6 +44,7 @@ class Settings(BaseSettings):
             "SPECTRUM_BRIDGE_TOKEN": self.spectrum_bridge_token,
             "SPECTRUM_SHARED_NUMBER": self.spectrum_shared_number,
             "ADMIN_API_KEY": self.admin_api_key,
+            "FMP_API_KEY": self.fmp_api_key,
         }
         missing = [name for name, value in required.items() if not value]
         if missing:

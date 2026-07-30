@@ -19,6 +19,10 @@ MATERIAL_EXTENDED_MOVE = 2.0
 MAX_RESEARCH_CANDIDATES = 5
 
 
+class MarketDataUnavailable(RuntimeError):
+    pass
+
+
 class MarketDataClient:
     def __init__(self, settings: Settings, client: httpx.AsyncClient | None = None):
         self.settings = settings
@@ -47,6 +51,8 @@ class MarketDataClient:
     ) -> list[MarketSignal]:
         tickers = sorted({holding.ticker.upper() for holding in snapshot.holdings if holding.ticker})
         quotes = await self.quotes(tickers)
+        if tickers and not quotes:
+            raise MarketDataUnavailable("Regular market quotes are unavailable")
         session = market_session(now)
         extended = await self.extended_trades(tickers) if session != "regular" else {}
         return build_signals(snapshot, quotes, extended, now=now)
@@ -89,9 +95,10 @@ def build_signals(
 
         extended_price = _number(after.get("price"))
         extended_change = _percent_change(extended_price, regular_price)
+        has_market_data = bool(quote or after)
         timestamp = _timestamp(after) if extended_price is not None else _timestamp(quote)
         timestamp = timestamp or observed
-        fresh = observed - timestamp <= _freshness_window(session)
+        fresh = has_market_data and observed - timestamp <= _freshness_window(session)
         active_move = (
             extended_change
             if extended_change is not None and session != "regular"
