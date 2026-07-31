@@ -20,12 +20,13 @@ async def send_for_user(
     user_id: UUID,
     *,
     http: httpx.AsyncClient | None = None,
+    force: bool = False,
 ) -> bool:
     user = await crud.user_by_id(user_id)
     if user is None or not user.is_active or user.onboarding_step.value != "complete":
         return False
     local_date = _local_now(user.timezone).date()
-    if await crud.brief_exists(user.id, local_date):
+    if not force and await crud.brief_exists(user.id, local_date):
         return False
     try:
         await wealthsimple.sync_user(user.id)

@@ -65,4 +65,18 @@ async def test_cron_brief_runs_agent(session) -> None:
 
     assert sent
     assert agent.called_with == user.id
-    assert await crud.brief_exists(user.id, datetime.now(UTC).date())
+    assert await crud.brief_exists(user.id, briefs._local_now(user.timezone).date())
+
+    async with httpx.AsyncClient(
+        transport=httpx.MockTransport(handler), base_url="http://127.0.0.1:8787"
+    ) as http:
+        sent_again = await briefs.send_for_user(
+            Settings(_env_file=None),
+            FakeWealthsimple(),
+            agent,
+            user.id,
+            http=http,
+            force=True,
+        )
+
+    assert sent_again

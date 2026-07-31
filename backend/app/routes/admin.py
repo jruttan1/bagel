@@ -27,7 +27,7 @@ async def sync_user(
 async def send_brief(user_id: UUID, request: Request) -> dict[str, bool]:
     if request.app.state.send_brief is None:
         raise HTTPException(status_code=503, detail="Portfolio briefs are not configured")
-    return {"sent": await request.app.state.send_brief(user_id)}
+    return {"sent": await request.app.state.send_brief(user_id, force=True)}
 
 
 @router.put("/users/{user_id}/theses/{ticker}")

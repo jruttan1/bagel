@@ -490,16 +490,19 @@ async def record_brief(
     evidence: dict | None = None,
 ) -> None:
     async with SessionLocal() as session:
-        session.add(
-            MorningBrief(
-                user_id=user_id,
-                brief_date=brief_date,
-                snapshot_id=snapshot_id,
-                content=content,
-                evidence_data=evidence or {},
-                provider_outbox_id=provider_id,
+        brief = await session.scalar(
+            select(MorningBrief).where(
+                MorningBrief.user_id == user_id,
+                MorningBrief.brief_date == brief_date,
             )
         )
+        if brief is None:
+            brief = MorningBrief(user_id=user_id, brief_date=brief_date)
+            session.add(brief)
+        brief.snapshot_id = snapshot_id
+        brief.content = content
+        brief.evidence_data = evidence or {}
+        brief.provider_outbox_id = provider_id
         await session.commit()
 
 
